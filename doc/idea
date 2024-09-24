@@ -1,0 +1,10 @@
+Stack-based (point-free) implementation of the incredible proof machine
+
+See [incredible.pm]
+
+Claims:
+
+>> [imp] claim  ; (meta-theory claim for "A => A"
+>> prove        ; start proof, pushes "A"
+>> id           ; A ~> A
+>> qed          ; results in [imp] thm (theorem for "A => A")
