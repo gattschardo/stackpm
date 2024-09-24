@@ -4,7 +4,31 @@ See [incredible.pm]
 
 Claims:
 
->> [imp] claim  ; (meta-theory claim for "A => A"
->> prove        ; start proof, pushes "A"
->> id           ; A ~> A
->> qed          ; results in [imp] thm (theorem for "A => A")
+>> [A] [A] claim  ; (meta-theory claim for "A => A"
+>> prove          ; start proof, pushes "A"
+>> id             ; A ~> A
+>> qed            ; results in [imp] thm (theorem for "A => A")
+
+
+## Session 1 claims
+
+[A] [A] claim
+[A B] [A] claim
+[A B] [B A] claim
+[A B] [A B &] claim
+[A A] [A A &] claim
+[A B &] [A] claim
+[A B &] [A B] claim
+[A B &] [A B &] claim
+[A B &] [B A &] claim
+[A B & C &] [A B C] claim
+[A B & C &] [A C &] claim
+[A B & C &] [A B C & &] claim
+
+## Session 2 claims
+
+[A A B ->] [B] claim
+[A A B -> B C ->] [C] claim
+[A A B -> A C -> B D -> C D ->] [D] claim
+[A A A ->] [A] claim
+[A B -> B C ->] [A C ->] claim

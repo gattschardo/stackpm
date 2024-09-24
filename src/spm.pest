@@ -1,7 +1,9 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
-word = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+op = @{ "?" | "&" | "∧" | "|" | "∨" | "->" | "→" }
+var = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+word = @{ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* }
 
 quote = { "[" ~ expr* ~ "]" }
-expr = _{ word | quote }
+expr = _{ op | var | word | quote }
 program = _{ SOI ~ expr* ~ EOI }
