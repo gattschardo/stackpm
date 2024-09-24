@@ -1,0 +1,7 @@
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+word = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+
+quote = { "[" ~ expr* ~ "]" }
+expr = { word | quote }
+program = _{ SOI ~ expr* ~ EOI }
