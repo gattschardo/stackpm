@@ -14,20 +14,47 @@ fn main() {
 #[cfg(test)]
 mod test;
 
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+enum Mode {
+    Normal,
+    Proof,
+}
+
 fn repl() {
     let mut s = Vec::new();
+    let mut m = Mode::Normal;
     let ctx = types::context();
-    loop {
-        let raw = read().unwrap();
+    let mut run = true;
+    while run {
+        let raw = read()
+            .or_else(|| {
+                run = false;
+                Some("".to_string())
+            })
+            .unwrap();
         let es = ast::parse(&raw).unwrap();
         for e in es {
-            if e == Expr::Word("?".to_string()) {
-                println!("{}", s.last().unwrap());
-                continue;
+            match e {
+                Expr::Op(Op::Help) => {
+                    println!("{}", s.last().unwrap());
+                    continue;
+                }
+                _ => {}
             }
-            if let Some(w) = types::check(&ctx, &e) {
-                exec(&mut s, w);
-            }
+            m = match m {
+                Mode::Normal => {
+                    let m = exec(&mut s, e);
+                    //println!("stack len is {}", s.len());
+                    m
+                }
+                Mode::Proof => {
+                    if let Some(w) = types::check(&ctx, &e) {
+                        println!("known type {w}");
+                    }
+                    todo!()
+                }
+            };
         }
     }
 }
@@ -37,18 +64,105 @@ fn read() -> Option<String> {
     print!("> ");
     std::io::stdout().flush().ok()?;
     let mut r = String::new();
-    let _ = std::io::stdin().read_line(&mut r).ok()?;
+    let n = std::io::stdin().read_line(&mut r).ok()?;
+    if n == 0 {
+        return None;
+    }
     Some(r)
 }
 
-fn exec(s: &mut Vec<Expr>, w: &str) {
-    match w {
-        "imp" => s.push(Expr::Word("A".to_string())),
-        _ => todo!(),
+fn pop_quote(s: &mut Vec<Expr>) -> Option<Vec<Expr>> {
+    if s.is_empty() {
+        eprintln!("expected quote, found empty stack");
+    }
+    let q = s.pop()?;
+    match q {
+        Expr::Quote(qq) => Some(qq.into_iter().rev().collect()),
+        e => {
+            eprintln!("expected quote, found {e}");
+            None
+        }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
+struct Prop {
+    before: Vec<Expr>,
+    after: Vec<Expr>,
+}
+
+impl std::fmt::Display for Prop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let Prop { before, after } = self;
+        write!(
+            f,
+            "prop: {} -- {}",
+            eval_prop(before.clone()).unwrap(),
+            eval_prop(after.clone()).unwrap()
+        )
+    }
+}
+
+fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Prop {
+    let c = Prop {
+        before: b,
+        after: a,
+    };
+    //println!("{c}");
+    c
+}
+
+fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
+    match e {
+        Expr::Op(Op::Help) => {
+            for w in s.iter().take(4) {
+                print!("{w} ");
+            }
+            println!();
+        }
+        Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
+        Expr::Word(w) if w == "claim" => {
+            let a = pop_quote(s).unwrap();
+            let b = pop_quote(s).unwrap();
+            s.push(Expr::Prop(make_prop(a, b)));
+        }
+        Expr::Quote(q) => {
+            //println!("pushing quote {q:?}");
+            s.push(Expr::Quote(q))
+        }
+        _ => todo!(),
+    }
+    Mode::Normal
+}
+
+fn render(e: Expr) -> String {
+    match e {
+        Expr::Var(v) => v,
+        Expr::Word(w) => format!("({w})"),
+        _ => unimplemented!(),
+    }
+}
+
+fn eval_prop(mut p: Vec<Expr>) -> Option<String> {
+    let mut s = Vec::new();
+    while let Some(e) = p.pop() {
+        match e {
+            v @ Expr::Var(_) => s.push(v),
+            Expr::Op(o) => {
+                //eprintln!("at op {o}");
+                let b = render(s.pop()?);
+                //eprintln!("first arg: {a}");
+                let a = render(s.pop()?);
+                //eprintln!("snd arg: {b}");
+                s.push(Expr::Word(format!("{a} {o} {b}")))
+            }
+            _ => todo!(),
+        }
+    }
+    Some(format!("{}", Expr::Quote(s)))
+}
+
+#[derive(Debug, Clone, Copy)]
 enum Op {
     Help,
     And,
@@ -56,12 +170,13 @@ enum Op {
     Imp,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
 enum Expr {
     Op(Op),
     Var(String),
     Word(String),
     Quote(Vec<Expr>),
+    Prop(Prop),
 }
 
 impl std::fmt::Display for Op {
@@ -93,6 +208,7 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, "]")
             }
+            Expr::Prop(c) => write!(f, "{c}"),
         }
     }
 }
@@ -104,7 +220,7 @@ mod types {
 
     pub enum Typ {
         Var,
-        //Claim,
+        //Prop,
         //Thm,
     }
 
@@ -141,10 +257,8 @@ mod types {
                 assert!(ctx.get(w).is_some());
                 Some(w)
             }
-            Expr::Quote(_) => {
-                println!("???");
-                None
-            }
+            Expr::Quote(_) => None,
+            Expr::Prop(_) => None,
         }
     }
 }
