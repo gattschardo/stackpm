@@ -97,19 +97,17 @@ impl std::fmt::Display for Prop {
         write!(
             f,
             "prop: {} -- {}",
-            eval_prop(before.clone()).unwrap(),
-            eval_prop(after.clone()).unwrap()
+            display_stack(before),
+            display_stack(after)
         )
     }
 }
 
-fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Prop {
-    let c = Prop {
-        before: b,
-        after: a,
-    };
-    //println!("{c}");
-    c
+fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
+    Some(Prop {
+        before: eval_prop(b)?,
+        after: eval_prop(a)?,
+    })
 }
 
 fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
@@ -124,7 +122,7 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
         Expr::Word(w) if w == "claim" => {
             let a = pop_quote(s).unwrap();
             let b = pop_quote(s).unwrap();
-            s.push(Expr::Prop(make_prop(a, b)));
+            s.push(Expr::Prop(make_prop(a, b).unwrap()));
         }
         Expr::Quote(q) => {
             //println!("pushing quote {q:?}");
@@ -135,31 +133,28 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
     Mode::Normal
 }
 
-fn render(e: Expr) -> String {
+fn render(e: &Expr) -> String {
     match e {
-        Expr::Var(v) => v,
-        Expr::Word(w) => format!("({w})"),
+        Expr::Var(v) => v.clone(),
+        a @ Expr::App(_, _, _) => format!("({a})"),
         _ => unimplemented!(),
     }
 }
 
-fn eval_prop(mut p: Vec<Expr>) -> Option<String> {
+fn eval_prop(mut p: Vec<Expr>) -> Option<Vec<Expr>> {
     let mut s = Vec::new();
     while let Some(e) = p.pop() {
         match e {
             v @ Expr::Var(_) => s.push(v),
             Expr::Op(o) => {
-                //eprintln!("at op {o}");
-                let b = render(s.pop()?);
-                //eprintln!("first arg: {a}");
-                let a = render(s.pop()?);
-                //eprintln!("snd arg: {b}");
-                s.push(Expr::Word(format!("{a} {o} {b}")))
+                let b = Box::new(s.pop()?);
+                let a = Box::new(s.pop()?);
+                s.push(Expr::App(o, a, b));
             }
             _ => todo!(),
         }
     }
-    Some(format!("{}", Expr::Quote(s)))
+    Some(s)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -173,6 +168,7 @@ enum Op {
 #[derive(Debug, Clone)]
 enum Expr {
     Op(Op),
+    App(Op, Box<Expr>, Box<Expr>),
     Var(String),
     Word(String),
     Quote(Vec<Expr>),
@@ -190,10 +186,24 @@ impl std::fmt::Display for Op {
     }
 }
 
+fn display_stack(v: &[Expr]) -> String {
+    let mut s = String::new();
+    let mut it = v.iter().peekable();
+    while let Some(e) = it.next() {
+        if it.peek().is_some() {
+            s.push_str(&format!("{e} "));
+        } else {
+            s.push_str(&format!("{e}"));
+        }
+    }
+    s
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Expr::Op(o) => write!(f, "{o}"),
+            Expr::App(o, a, b) => write!(f, "{} {o} {}", render(&*a), render(&*b)),
             Expr::Var(v) => write!(f, "{v}"),
             Expr::Word(w) => write!(f, "{w}"),
             Expr::Quote(q) => {
@@ -252,6 +262,7 @@ mod types {
     pub fn check<'a>(ctx: &HashMap<String, WTyp>, e: &'a Expr) -> Option<&'a str> {
         match e {
             Expr::Op(_) => None,
+            Expr::App(_, _, _) => None,
             Expr::Var(_) => None,
             Expr::Word(w) => {
                 assert!(ctx.get(w).is_some());
