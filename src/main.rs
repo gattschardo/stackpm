@@ -37,7 +37,10 @@ fn repl() {
         for e in es {
             match e {
                 Expr::Op(Op::Help) => {
-                    println!("{}", s.last().unwrap());
+                    match s.last() {
+                        Some(v) => println!("{v}"),
+                        None => println!("ε"),
+                    }
                     continue;
                 }
                 _ => {}
@@ -206,18 +209,7 @@ impl std::fmt::Display for Expr {
             Expr::App(o, a, b) => write!(f, "{} {o} {}", render(&*a), render(&*b)),
             Expr::Var(v) => write!(f, "{v}"),
             Expr::Word(w) => write!(f, "{w}"),
-            Expr::Quote(q) => {
-                write!(f, "[")?;
-                let mut it = q.iter().peekable();
-                while let Some(e) = it.next() {
-                    if it.peek().is_some() {
-                        write!(f, "{e} ")?;
-                    } else {
-                        write!(f, "{e}")?;
-                    }
-                }
-                write!(f, "]")
-            }
+            Expr::Quote(q) => write!(f, "[{}]", display_stack(q)),
             Expr::Prop(c) => write!(f, "{c}"),
         }
     }
