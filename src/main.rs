@@ -94,6 +94,10 @@ fn prove(
             return Some((Mode::Normal, Some(make_theorem(prop.clone(), proof))));
         }
         Expr::Word(ref w) => match w.as_ref() {
+            "drop" => {
+                let _ = pop(&mut s)?;
+                proof.push(e.clone());
+            }
             "swap" => {
                 let a = pop(&mut s)?;
                 let b = pop(&mut s)?;
@@ -101,15 +105,26 @@ fn prove(
                 s.push(a);
                 s.push(b);
             }
-            "drop" => {
-                let _ = pop(&mut s)?;
+            "dig2" => {
+                let a = pop(&mut s)?;
+                let b = pop(&mut s)?;
+                let c = pop(&mut s)?;
                 proof.push(e.clone());
+                s.push(b);
+                s.push(a);
+                s.push(c);
             }
             "and_intro" => {
                 let b = pop(&mut s)?;
                 let a = pop(&mut s)?;
                 proof.push(e.clone());
                 s.push(Term::App(Op::And, Box::new(a), Box::new(b)));
+            }
+            "and_elim" => {
+                let (a, b) = pop_and(&mut s)?;
+                proof.push(e.clone());
+                s.push(a);
+                s.push(b);
             }
             other => todo!("prove other word {other}"),
         },
@@ -174,6 +189,14 @@ fn pop<T>(s: &mut Vec<T>) -> Option<T> {
         eprintln!("expected value, found empty stack");
     }
     s.pop()
+}
+
+fn pop_and(s: &mut Vec<Term>) -> Option<(Term, Term)> {
+    let o = pop(s)?;
+    match o {
+        Term::App(Op::And, a, b) => Some((*a, *b)),
+        _ => None,
+    }
 }
 
 fn pop_prop(s: &mut Vec<Expr>) -> Option<Prop> {
@@ -293,6 +316,22 @@ enum Expr {
     Term(Term),
     Prop(Prop),
     Thm(Theorem),
+}
+
+impl Expr {
+    pub fn as_prop(&self) -> Option<&Prop> {
+        match self {
+            Expr::Prop(p) => Some(p),
+            _ => None,
+        }
+    }
+
+    pub fn as_quote(&self) -> Option<&[Expr]> {
+        match self {
+            Expr::Quote(q) => Some(&q),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Op {
