@@ -90,8 +90,8 @@ fn pop_quote(s: &mut Vec<Expr>) -> Option<Vec<Expr>> {
 
 #[derive(Debug, Clone)]
 struct Prop {
-    before: Vec<Expr>,
-    after: Vec<Expr>,
+    before: Vec<Term>,
+    after: Vec<Term>,
 }
 
 impl std::fmt::Display for Prop {
@@ -108,8 +108,8 @@ impl std::fmt::Display for Prop {
 
 fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
     Some(Prop {
-        before: eval_prop(b)?,
-        after: eval_prop(a)?,
+        before: make_terms(b)?,
+        after: make_terms(a)?,
     })
 }
 
@@ -122,11 +122,20 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
             println!();
         }
         Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
-        Expr::Word(w) if w == "claim" => {
-            let a = pop_quote(s).unwrap();
-            let b = pop_quote(s).unwrap();
-            s.push(Expr::Prop(make_prop(a, b).unwrap()));
-        }
+        Expr::Word(w) => match w.as_ref() {
+            "term" => {
+                let a = pop_quote(s).unwrap();
+                let mut ts = make_terms(a).unwrap();
+                assert_eq!(ts.len(), 1);
+                s.push(Expr::Term(ts.pop().unwrap()));
+            }
+            "claim" => {
+                let a = pop_quote(s).unwrap();
+                let b = pop_quote(s).unwrap();
+                s.push(Expr::Prop(make_prop(a, b).unwrap()));
+            }
+            other => todo!("other word {other}"),
+        },
         Expr::Quote(q) => {
             //println!("pushing quote {q:?}");
             s.push(Expr::Quote(q))
@@ -136,23 +145,22 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
     Mode::Normal
 }
 
-fn render(e: &Expr) -> String {
+fn render(e: &Term) -> String {
     match e {
-        Expr::Var(v) => v.clone(),
-        a @ Expr::App(_, _, _) => format!("({a})"),
-        _ => unimplemented!(),
+        Term::Var(v) => v.clone(),
+        a @ Term::App(_, _, _) => format!("({a})"),
     }
 }
 
-fn eval_prop(mut p: Vec<Expr>) -> Option<Vec<Expr>> {
+fn make_terms(mut p: Vec<Expr>) -> Option<Vec<Term>> {
     let mut s = Vec::new();
     while let Some(e) = p.pop() {
         match e {
-            v @ Expr::Var(_) => s.push(v),
+            Expr::Var(v) => s.push(Term::Var(v)),
             Expr::Op(o) => {
                 let b = Box::new(s.pop()?);
                 let a = Box::new(s.pop()?);
-                s.push(Expr::App(o, a, b));
+                s.push(Term::App(o, a, b));
             }
             _ => todo!(),
         }
@@ -169,10 +177,16 @@ enum Op {
 }
 
 #[derive(Debug, Clone)]
+enum Term {
+    Var(String),
+    App(Op, Box<Term>, Box<Term>),
+}
+
+#[derive(Debug, Clone)]
 enum Expr {
     Op(Op),
-    App(Op, Box<Expr>, Box<Expr>),
     Var(String),
+    Term(Term),
     Word(String),
     Quote(Vec<Expr>),
     Prop(Prop),
@@ -189,7 +203,10 @@ impl std::fmt::Display for Op {
     }
 }
 
-fn display_stack(v: &[Expr]) -> String {
+fn display_stack<T>(v: &[T]) -> String
+where
+    T: std::fmt::Display,
+{
     let mut s = String::new();
     let mut it = v.iter().peekable();
     while let Some(e) = it.next() {
@@ -202,13 +219,22 @@ fn display_stack(v: &[Expr]) -> String {
     s
 }
 
+impl std::fmt::Display for Term {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Term::App(o, a, b) => write!(f, "{} {o} {}", render(&*a), render(&*b)),
+            Term::Var(v) => write!(f, "{v}"),
+        }
+    }
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Expr::Op(o) => write!(f, "{o}"),
-            Expr::App(o, a, b) => write!(f, "{} {o} {}", render(&*a), render(&*b)),
             Expr::Var(v) => write!(f, "{v}"),
             Expr::Word(w) => write!(f, "{w}"),
+            Expr::Term(t) => write!(f, "{}", *t),
             Expr::Quote(q) => write!(f, "[{}]", display_stack(q)),
             Expr::Prop(c) => write!(f, "{c}"),
         }
@@ -254,7 +280,7 @@ mod types {
     pub fn check<'a>(ctx: &HashMap<String, WTyp>, e: &'a Expr) -> Option<&'a str> {
         match e {
             Expr::Op(_) => None,
-            Expr::App(_, _, _) => None,
+            Expr::Term(_) => None,
             Expr::Var(_) => None,
             Expr::Word(w) => {
                 assert!(ctx.get(w).is_some());

@@ -1,7 +1,26 @@
-#[test]
-fn session1() {
+fn eval(i: &str) -> crate::Expr {
     use crate::{ast, exec};
 
+    let es = ast::parse(i).unwrap();
+    let mut s = Vec::new();
+    for e in es {
+        let _ = exec(&mut s, e);
+    }
+    assert_eq!(s.len(), 1);
+    let t = s.pop().unwrap();
+    println!("{t}");
+    t
+}
+
+#[test]
+fn term() {
+    let t = eval("[A B & C | D ->] term");
+    println!("{t}");
+    assert_eq!("((A ∧ B) ∨ C) → D", format!("{t}"));
+}
+
+#[test]
+fn session1() {
     for (task, prop) in [
         ("[A] [A] claim", "prop: A -- A"),
         ("[A B] [A] claim", "prop: A B -- A"),
@@ -19,15 +38,7 @@ fn session1() {
             "prop: (A ∧ B) ∧ C -- A ∧ (B ∧ C)",
         ),
     ] {
-        let es = ast::parse(task);
-        //println!("{e:?}");
-        assert!(es.is_ok());
-        let mut s = Vec::new();
-        for e in es.unwrap() {
-            let _ = exec(&mut s, e);
-        }
-        assert_eq!(s.len(), 1);
-        let p = s.pop().unwrap();
+        let p = eval(task);
         println!("{p}");
         assert_eq!(prop, format!("{p}"));
     }
