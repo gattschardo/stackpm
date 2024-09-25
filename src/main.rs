@@ -101,6 +101,12 @@ fn prove(
                 s.push(a);
                 s.push(b);
             }
+            "and_intro" => {
+                let b = pop(&mut s)?;
+                let a = pop(&mut s)?;
+                proof.push(e.clone());
+                s.push(Term::App(Op::And, Box::new(a), Box::new(b)));
+            }
             other => todo!("prove other word {other}"),
         },
         other => todo!("prove {other}"),
@@ -123,13 +129,22 @@ fn unify(a: &[Term], b: &[Term]) -> bool {
         return false;
     }
     for (ta, tb) in std::iter::zip(a, b) {
-        match (ta, tb) {
-            (Term::Var(va), Term::Var(vb)) if va == vb => {
-                // ok
-            }
-            _ => {
-                return false;
-            }
+        if !uni(ta, tb) {
+            return false;
+        }
+    }
+    true
+}
+
+fn uni(a: &Term, b: &Term) -> bool {
+    match (a, b) {
+        (Term::Var(va), Term::Var(vb)) if va == vb => {
+            // ok
+        }
+        (Term::App(o1, a1, b1), Term::App(o2, a2, b2))
+            if o1 == o2 && uni(&*a1, &*a2) && uni(&*b1, &*b2) => {}
+        _ => {
+            return false;
         }
     }
     true
@@ -248,7 +263,7 @@ fn make_terms(mut p: Vec<Expr>) -> Option<Vec<Term>> {
     Some(s)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Op {
     Help,
     And,

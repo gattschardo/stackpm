@@ -2,7 +2,7 @@ WHITESPACE = _{ " " | "\t" | NEWLINE }
 
 op = @{ "?" | "&" | "∧" | "|" | "∨" | "->" | "→" }
 var = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
-word = @{ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* }
+word = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")* }
 
 quote = { "[" ~ expr* ~ "]" }
 expr = _{ op | var | word | quote }
