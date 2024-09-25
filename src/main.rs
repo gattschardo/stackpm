@@ -35,51 +35,52 @@ fn repl() {
             .unwrap();
         let es = ast::parse(&raw).unwrap();
         for e in es {
-            match e {
-                Expr::Op(Op::Help) => {
-                    match s.last() {
-                        Some(v) => println!("{v}"),
-                        None => println!("ε"),
-                    }
-                    continue;
+            if is_help(&e) {
+                match &m {
+                    Mode::Normal => help("toplevel", &s),
+                    Mode::Proof(prop, stk, _) => help(&format!("proving {prop}"), &stk),
                 }
-                _ => {}
+                continue;
             }
+            let n0 = m.clone();
             m = match m {
-                Mode::Normal => {
-                    let m = exec(&mut s, e);
-                    //println!("stack len is {}", s.len());
-                    m
-                }
-                Mode::Proof(prop, stk, proof) => {
-                    /*
-                    if let Some(w) = types::check(&ctx, &e) {
-                        println!("known type {w}");
+                Mode::Normal => exec(&mut s, e),
+                Mode::Proof(prop, stk, proof) => match prove(prop, stk, e, proof) {
+                    None => n0,
+                    Some((Mode::Normal, thm)) => {
+                        s.push(Expr::Thm(thm.unwrap()));
+                        Mode::Normal
                     }
-                    todo!()
-                    */
-                    let e0 = e.clone();
-                    let stk0 = stk.clone();
-                    let pf0 = proof.clone();
-                    let (m1, thm) = prove(&prop, stk, e, proof);
-                    match m1 {
-                        None => {
-                            s.push(e0);
-                            Mode::Proof(prop, stk0, pf0)
-                        }
-                        Some(Mode::Normal) => {
-                            s.push(Expr::Thm(thm.unwrap()));
-                            Mode::Normal
-                        }
-                        Some(p) => p,
-                    }
-                }
+                    Some((p, _)) => p,
+                },
             };
         }
     }
 }
 
-fn prove(prop: &Prop, s: Vec<Term>, e: Expr, proof: Vec<Expr>) -> (Option<Mode>, Option<Theorem>) {
+fn is_help(e: &Expr) -> bool {
+    match e {
+        Expr::Op(Op::Help) => true,
+        _ => false,
+    }
+}
+
+fn help<T>(m: &str, s: &[T])
+where
+    T: std::fmt::Display,
+{
+    match s.last() {
+        Some(v) => println!("{m}: {v}"),
+        None => println!("{m}: ε"),
+    }
+}
+
+fn prove(
+    prop: Prop,
+    mut s: Vec<Term>,
+    e: Expr,
+    mut proof: Vec<Expr>,
+) -> Option<(Mode, Option<Theorem>)> {
     match e {
         Expr::Word(w) if w == "qed" => {
             if !unify(&s, &prop.after) {
@@ -88,13 +89,23 @@ fn prove(prop: &Prop, s: Vec<Term>, e: Expr, proof: Vec<Expr>) -> (Option<Mode>,
                     display_stack(&prop.after),
                     display_stack(&s)
                 );
-                return (None, None);
+                return None;
             }
-            return (Some(Mode::Normal), Some(make_theorem(prop.clone(), proof)));
+            return Some((Mode::Normal, Some(make_theorem(prop.clone(), proof))));
         }
+        Expr::Word(ref w) => match w.as_ref() {
+            "swap" => {
+                let a = pop(&mut s)?;
+                let b = pop(&mut s)?;
+                proof.push(e.clone());
+                s.push(a);
+                s.push(b);
+            }
+            other => todo!("prove other word {other}"),
+        },
         other => todo!("prove {other}"),
     }
-    //(Some(Mode::Proof()), None)
+    Some((Mode::Proof(prop, s, proof), None))
 }
 
 #[derive(Debug, Clone)]
@@ -136,9 +147,9 @@ fn read() -> Option<String> {
     Some(r)
 }
 
-fn pop(s: &mut Vec<Expr>) -> Option<Expr> {
+fn pop<T>(s: &mut Vec<T>) -> Option<T> {
     if s.is_empty() {
-        eprintln!("expected quote, found empty stack");
+        eprintln!("expected value, found empty stack");
     }
     s.pop()
 }
@@ -169,18 +180,6 @@ fn pop_quote(s: &mut Vec<Expr>) -> Option<Vec<Expr>> {
 struct Prop {
     before: Vec<Term>,
     after: Vec<Term>,
-}
-
-impl std::fmt::Display for Prop {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let Prop { before, after } = self;
-        write!(
-            f,
-            "prop: {} -- {}",
-            display_stack(before),
-            display_stack(after)
-        )
-    }
 }
 
 fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
@@ -310,6 +309,13 @@ impl std::fmt::Display for Term {
     }
 }
 
+impl std::fmt::Display for Prop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let Prop { before, after } = self;
+        write!(f, "{} -- {}", display_stack(before), display_stack(after))
+    }
+}
+
 impl std::fmt::Display for Theorem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let Theorem { prop, proof } = self;
@@ -325,7 +331,7 @@ impl std::fmt::Display for Expr {
             Expr::Word(w) => write!(f, "{w}"),
             Expr::Term(t) => write!(f, "{}", *t),
             Expr::Quote(q) => write!(f, "[{}]", display_stack(q)),
-            Expr::Prop(c) => write!(f, "{c}"),
+            Expr::Prop(c) => write!(f, "prop: {c}"),
             Expr::Thm(t) => write!(f, "{t}"),
         }
     }
