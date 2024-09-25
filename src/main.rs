@@ -101,6 +101,10 @@ fn prove(
                 s.push(a);
                 s.push(b);
             }
+            "drop" => {
+                let _ = pop(&mut s)?;
+                proof.push(e.clone());
+            }
             "and_intro" => {
                 let b = pop(&mut s)?;
                 let a = pop(&mut s)?;
@@ -142,7 +146,10 @@ fn uni(a: &Term, b: &Term) -> bool {
             // ok
         }
         (Term::App(o1, a1, b1), Term::App(o2, a2, b2))
-            if o1 == o2 && uni(&*a1, &*a2) && uni(&*b1, &*b2) => {}
+            if o1 == o2 && uni(&*a1, &*a2) && uni(&*b1, &*b2) =>
+        {
+            // ok
+        }
         _ => {
             return false;
         }
