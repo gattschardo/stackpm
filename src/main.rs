@@ -32,7 +32,7 @@ fn repl() {
                 run = false;
                 Some("".to_string())
             })
-            .unwrap();
+            .expect("option not filled after or_else");
         let es = match ast::parse(&raw) {
             Ok(r) => r,
             Err(e) => {
@@ -273,8 +273,13 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
             "term" => {
                 let a = pop_quote(s)?;
                 let mut ts = make_terms(a)?;
-                assert_eq!(ts.len(), 1);
-                s.push(Expr::Term(ts.pop()?));
+                match ts.len() {
+                    1 => s.push(Expr::Term(ts.pop().expect("pop failed for vec of len() 1"))),
+                    n => {
+                        println!("expected single element term, found {n}");
+                        return None;
+                    }
+                }
             }
             "claim" => {
                 let a = pop_quote(s)?;
