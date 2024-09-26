@@ -33,7 +33,13 @@ fn repl() {
                 Some("".to_string())
             })
             .unwrap();
-        let es = ast::parse(&raw).unwrap();
+        let es = match ast::parse(&raw) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("failed to parse input: {e}");
+                continue;
+            }
+        };
         for e in es {
             if is_help(&e) {
                 match &m {
@@ -44,11 +50,20 @@ fn repl() {
             }
             let n0 = m.clone();
             m = match m {
-                Mode::Normal => exec(&mut s, e),
+                Mode::Normal => match exec(&mut s, e) {
+                    Some(m) => m,
+                    None => {
+                        println!("?");
+                        n0
+                    }
+                },
                 Mode::Proof(prop, stk, proof) => match prove(prop, stk, e, proof) {
                     None => n0,
                     Some((Mode::Normal, thm)) => {
-                        s.push(Expr::Thm(thm.unwrap()));
+                        match thm {
+                            Some(thm) => s.push(Expr::Thm(thm)),
+                            None => {} //s.push(Expr::Prop(prop)),
+                        }
                         Mode::Normal
                     }
                     Some((p, _)) => p,
@@ -69,9 +84,15 @@ fn help<T>(m: &str, s: &[T])
 where
     T: std::fmt::Display,
 {
-    match s.last() {
-        Some(v) => println!("{m}: {v}"),
-        None => println!("{m}: ε"),
+    print!("{m}: ");
+    match s.len() {
+        0 => println!("ε"),
+        n if n <= 5 => {
+            println!("{}", display_stack(s))
+        }
+        _ => {
+            println!("... {}", display_stack(&s[s.len() - 5..]))
+        }
     }
 }
 
@@ -92,6 +113,10 @@ fn prove(
                 return None;
             }
             return Some((Mode::Normal, Some(make_theorem(prop.clone(), proof))));
+        }
+        Expr::Word(w) if w == "abort" => {
+            println!("aborting proof attempt");
+            return Some((Mode::Normal, None));
         }
         Expr::Word(ref w) => match w.as_ref() {
             "drop" => {
@@ -126,9 +151,15 @@ fn prove(
                 s.push(a);
                 s.push(b);
             }
-            other => todo!("prove other word {other}"),
+            other => {
+                println!("prove other word {other}");
+                return None;
+            }
         },
-        other => todo!("prove {other}"),
+        other => {
+            println!("prove {other}");
+            return None;
+        }
     }
     Some((Mode::Proof(prop, s, proof), None))
 }
@@ -204,7 +235,7 @@ fn pop_prop(s: &mut Vec<Expr>) -> Option<Prop> {
     match p {
         Expr::Prop(pp) => Some(pp),
         e => {
-            eprintln!("expected quote, found {e}");
+            eprintln!("expected prop, found {e}");
             None
         }
     }
@@ -234,32 +265,30 @@ fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
     })
 }
 
-fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
+fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
     match e {
-        Expr::Op(Op::Help) => {
-            for w in s.iter().take(4) {
-                print!("{w} ");
-            }
-            println!();
-        }
+        Expr::Op(Op::Help) => unreachable!("handled above"),
         Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
         Expr::Word(w) => match w.as_ref() {
             "term" => {
-                let a = pop_quote(s).unwrap();
-                let mut ts = make_terms(a).unwrap();
+                let a = pop_quote(s)?;
+                let mut ts = make_terms(a)?;
                 assert_eq!(ts.len(), 1);
-                s.push(Expr::Term(ts.pop().unwrap()));
+                s.push(Expr::Term(ts.pop()?));
             }
             "claim" => {
-                let a = pop_quote(s).unwrap();
-                let b = pop_quote(s).unwrap();
-                s.push(Expr::Prop(make_prop(a, b).unwrap()));
+                let a = pop_quote(s)?;
+                let b = pop_quote(s)?;
+                s.push(Expr::Prop(make_prop(a, b)?));
             }
             "prove" => {
-                let ref p @ Prop { ref before, .. } = pop_prop(s).unwrap();
-                return Mode::Proof(p.clone(), before.clone(), Vec::new());
+                let ref p @ Prop { ref before, .. } = pop_prop(s)?;
+                return Some(Mode::Proof(p.clone(), before.clone(), Vec::new()));
             }
-            other => todo!("other word {other}"),
+            other => {
+                println!("other word {other}");
+                return None;
+            }
         },
         Expr::Quote(q) => {
             //println!("pushing quote {q:?}");
@@ -267,7 +296,7 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Mode {
         }
         _ => todo!(),
     }
-    Mode::Normal
+    Some(Mode::Normal)
 }
 
 fn render(e: &Term) -> String {
@@ -287,7 +316,10 @@ fn make_terms(mut p: Vec<Expr>) -> Option<Vec<Term>> {
                 let a = Box::new(s.pop()?);
                 s.push(Term::App(o, a, b));
             }
-            _ => todo!(),
+            other => {
+                println!("cannot convert {other} to term");
+                return None;
+            }
         }
     }
     Some(s)
