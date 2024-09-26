@@ -139,6 +139,15 @@ fn prove(
                 s.push(a);
                 s.push(c);
             }
+            "bury2" => {
+                let a = pop(&mut s)?;
+                let b = pop(&mut s)?;
+                let c = pop(&mut s)?;
+                proof.push(e.clone());
+                s.push(a);
+                s.push(c);
+                s.push(b);
+            }
             "and_intro" => {
                 let b = pop(&mut s)?;
                 let a = pop(&mut s)?;

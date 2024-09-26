@@ -1,10 +1,14 @@
-fn eval(i: &str) -> crate::Expr {
+fn eval2(i: &str, j: &str) -> crate::Expr {
     use crate::{ast, exec};
 
     let es = ast::parse(i).unwrap();
+    let fs = ast::parse(j).unwrap();
     let mut s = Vec::new();
     for e in es {
         let _ = exec(&mut s, e);
+    }
+    for f in fs {
+        let _ = exec(&mut s, f);
     }
     assert_eq!(s.len(), 1);
     let t = s.pop().unwrap();
@@ -14,7 +18,7 @@ fn eval(i: &str) -> crate::Expr {
 
 fn check_proof(task: &str, prop: &str, proof: &str) {
     use crate::{ast::parse, display_stack, prove, Expr, Mode, Prop};
-    let p = eval(task);
+    let p = eval2(task, "claim");
     println!("{p}");
     assert_eq!(prop, format!("{p}"));
     let Prop { before, .. } = p.as_prop().unwrap();
@@ -52,7 +56,7 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
 
 #[test]
 fn term() {
-    let t = eval("[A B & C | D ->] term");
+    let t = eval2("[A B & C | D ->]", "term");
     println!("{t}");
     assert_eq!("((A ∧ B) ∨ C) → D", format!("{t}"));
 }
@@ -60,31 +64,31 @@ fn term() {
 #[test]
 fn session1_and() {
     for (task, prop, proof) in [
-        ("[A] [A] claim", "prop: A -- A", "[]"),
-        ("[A B] [A] claim", "prop: A B -- A", "[drop]"),
-        ("[A B] [B A] claim", "prop: A B -- B A", "[swap]"),
-        ("[A B] [A B &] claim", "prop: A B -- A ∧ B", "[and_intro]"),
-        ("[A A] [A A &] claim", "prop: A A -- A ∧ A", "[and_intro]"),
-        ("[A B &] [A] claim", "prop: A ∧ B -- A", "[and_elim drop]"),
-        ("[A B &] [A B] claim", "prop: A ∧ B -- A B", "[and_elim]"),
-        ("[A B &] [A B &] claim", "prop: A ∧ B -- A ∧ B", "[]"),
+        ("[A] [A]", "prop: A -- A", "[]"),
+        ("[A B] [A]", "prop: A B -- A", "[drop]"),
+        ("[A B] [B A]", "prop: A B -- B A", "[swap]"),
+        ("[A B] [A B &]", "prop: A B -- A ∧ B", "[and_intro]"),
+        ("[A A] [A A &]", "prop: A A -- A ∧ A", "[and_intro]"),
+        ("[A B &] [A]", "prop: A ∧ B -- A", "[and_elim drop]"),
+        ("[A B &] [A B]", "prop: A ∧ B -- A B", "[and_elim]"),
+        ("[A B &] [A B &]", "prop: A ∧ B -- A ∧ B", "[]"),
         (
-            "[A B ∧] [B A &] claim",
+            "[A B ∧] [B A &]",
             "prop: A ∧ B -- B ∧ A",
             "[and_elim swap and_intro]",
         ),
         (
-            "[A B & C &] [A B C] claim",
+            "[A B & C &] [A B C]",
             "prop: (A ∧ B) ∧ C -- A B C",
             "[and_elim swap and_elim dig2]",
         ),
         (
-            "[A B & C &] [A C &] claim",
+            "[A B & C &] [A C &]",
             "prop: (A ∧ B) ∧ C -- A ∧ C",
             "[and_elim swap and_elim drop swap and_intro]",
         ),
         (
-            "[A B & C &] [A B C & &] claim",
+            "[A B & C &] [A B C & &]",
             "prop: (A ∧ B) ∧ C -- A ∧ (B ∧ C)",
             "[and_elim swap and_elim dig2 and_intro and_intro]",
         ),
@@ -95,7 +99,14 @@ fn session1_and() {
 
 #[test]
 fn session2_impl() {
-    for (task, prop, proof) in [("[A A B ->] [B] claim", "prop: A A → B -- B", "[imp_elim]")] {
+    for (task, prop, proof) in [
+        ("[A A B ->] [B]", "prop: A A → B -- B", "[imp_elim]"),
+        (
+            "[A A B -> B C ->] [C]",
+            "prop: A A → B B → C -- C",
+            "[bury2 imp_elim swap imp_elim]",
+        ),
+    ] {
         check_proof(task, prop, proof);
     }
 }
