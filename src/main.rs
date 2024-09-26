@@ -151,6 +151,13 @@ fn prove(
                 s.push(a);
                 s.push(b);
             }
+            "imp_elim" => {
+                let imp = pop_imp(&mut s)?;
+                let a = pop(&mut s)?;
+                let b = apply_imp(imp, a)?;
+                proof.push(e.clone());
+                s.push(b);
+            }
             other => {
                 println!("prove other word {other}");
                 return None;
@@ -230,6 +237,17 @@ fn pop_and(s: &mut Vec<Term>) -> Option<(Term, Term)> {
     }
 }
 
+fn pop_imp(s: &mut Vec<Term>) -> Option<Term> {
+    let i = pop(s)?;
+    match i {
+        Term::App(Op::Imp, _, _) => Some(i),
+        _ => {
+            eprintln!("expected implication, found {i}");
+            None
+        }
+    }
+}
+
 fn pop_prop(s: &mut Vec<Expr>) -> Option<Prop> {
     let p = pop(s)?;
     match p {
@@ -250,6 +268,18 @@ fn pop_quote(s: &mut Vec<Expr>) -> Option<Vec<Expr>> {
             None
         }
     }
+}
+
+fn apply_imp(imp: Term, a: Term) -> Option<Term> {
+    let (arg, conc) = match imp {
+        Term::App(Op::Imp, a, c) => Some((a, c)),
+        _ => None,
+    }?;
+    if !uni(&a, &arg) {
+        println!("argument does not match, expected {arg}, got {a}");
+        return None;
+    }
+    Some(*conc)
 }
 
 #[derive(Debug, Clone)]
