@@ -17,7 +17,7 @@ fn eval2(i: &str, j: &str) -> crate::Expr {
 }
 
 fn check_proof(task: &str, prop: &str, proof: &str) {
-    use crate::{ast::parse, display_stack, prove, Expr, Mode, Prop};
+    use crate::{ast::parse, display_stack, prove, Expr, Mode, ProofCtx, Prop};
     let p = eval2(task, "claim");
     println!("{p}");
     assert_eq!(prop, format!("{p}"));
@@ -37,7 +37,7 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
     let mut done = false;
     for e in v {
         let (stk1, pf1) = match prove(p.as_prop().unwrap().clone(), stk, e, pf) {
-            Some((Mode::Proof(_p, stk1, pf1), _)) => (stk1, pf1),
+            Some((Mode::Proof(ProofCtx { stk, proof, .. }), _)) => (stk, proof),
             Some((Mode::Normal, thm)) => {
                 assert_eq!(display_stack(&thm.unwrap().proof), display_stack(&v0));
                 done = true;
@@ -106,6 +106,8 @@ fn session2_impl() {
             "prop: A A → B B → C -- C",
             "[bury2 imp_elim swap imp_elim]",
         ),
+        //(_, "prop: A A → B A → C B → D C → D -- D", _),
+        //("[A B -> B C ->] [A -> C]", "prop: A → B B → C -- A → C", "[[dig2 imp_elim imp_elim] [A] imp_intro"),
     ] {
         check_proof(task, prop, proof);
     }

@@ -15,10 +15,16 @@ fn main() {
 mod test;
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+struct ProofCtx {
+    prop: Prop,
+    stk: Vec<Term>,
+    proof: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
 enum Mode {
     Normal,
-    Proof(Prop, Vec<Term>, Vec<Expr>),
+    Proof(ProofCtx),
 }
 
 fn repl() {
@@ -44,7 +50,9 @@ fn repl() {
             if is_help(&e) {
                 match &m {
                     Mode::Normal => help("toplevel", &s),
-                    Mode::Proof(prop, stk, _) => help(&format!("proving {prop}"), &stk),
+                    Mode::Proof(ProofCtx { prop, stk, .. }) => {
+                        help(&format!("proving {prop}"), &stk)
+                    }
                 }
                 continue;
             }
@@ -57,7 +65,7 @@ fn repl() {
                         n0
                     }
                 },
-                Mode::Proof(prop, stk, proof) => match prove(prop, stk, e, proof) {
+                Mode::Proof(ProofCtx { prop, stk, proof }) => match prove(prop, stk, e, proof) {
                     None => n0,
                     Some((Mode::Normal, thm)) => {
                         match thm {
@@ -177,7 +185,14 @@ fn prove(
             return None;
         }
     }
-    Some((Mode::Proof(prop, s, proof), None))
+    Some((
+        Mode::Proof(ProofCtx {
+            prop,
+            stk: s,
+            proof,
+        }),
+        None,
+    ))
 }
 
 #[derive(Debug, Clone)]
@@ -327,7 +342,11 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
             }
             "prove" => {
                 let ref p @ Prop { ref before, .. } = pop_prop(s)?;
-                return Some(Mode::Proof(p.clone(), before.clone(), Vec::new()));
+                return Some(Mode::Proof(ProofCtx {
+                    prop: p.clone(),
+                    stk: before.clone(),
+                    proof: Vec::new(),
+                }));
             }
             other => {
                 println!("other word {other}");
