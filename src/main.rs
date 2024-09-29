@@ -188,40 +188,15 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 let pf_q = pop_quote(&mut estk)?;
                 let mut inner_stk = stk.clone();
                 inner_stk.push(arg_term.clone());
-                let mut inner_ctx = ProofCtx {
-                    prop: prop.clone(),
-                    stk: inner_stk,
-                    proof: Vec::new(),
-                    estk: Vec::new(),
-                };
-                for e in pf_q.clone().into_iter().rev() {
-                    println!("running inner: {e:?}");
-                    let ctx1 = match prove(inner_ctx, e) {
-                        None => {
-                            println!("failed to introduce implication.");
-                            return None;
-                        }
-                        Some((Mode::Proof(ctx1), None)) => ctx1,
-                        y @ Some((Mode::Normal, None)) => {
-                            return y;
-                        }
-                        _ => {
-                            unreachable!("cannot finish proof inside imp_intro?");
-                        }
-                    };
-                    inner_ctx = ctx1;
-                }
-                if inner_ctx.stk.len() != 1 {
-                    println!(
-                        "stack length after imp_intro: {}, expected 1",
-                        inner_ctx.stk.len()
-                    );
-                    return None;
-                }
-                let ret_term = inner_ctx
-                    .stk
-                    .pop()
-                    .expect("pop of vec with length 1 failed?");
+                let ret_term = prove_sub(
+                    ProofCtx {
+                        prop: dummy_prop(),
+                        stk: inner_stk,
+                        proof: Vec::new(),
+                        estk: Vec::new(),
+                    },
+                    &pf_q.clone().into_iter().rev().collect::<Vec<_>>(),
+                )?;
                 stk.push(Term::App(Op::Imp, Box::new(arg_term), Box::new(ret_term)));
                 proof.push(Expr::Quote(pf_q.into_iter().rev().collect()));
                 proof.push(Expr::Quote(arg_q.into_iter().rev().collect()));
@@ -252,6 +227,42 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 proof.push(e);
                 stk.push(Term::App(Op::Or, Box::new(a), Box::new(b)));
             }
+            "or_elim" => {
+                let or = pop_or(&mut stk)?;
+                let (a, b) = dest_or(or)?;
+                let bq = pop_quote(&mut estk)?;
+                let aq = pop_quote(&mut estk)?;
+                let mut astk = stk.clone();
+                astk.push(a);
+                let a_ret = prove_sub(
+                    ProofCtx {
+                        prop: dummy_prop(),
+                        stk: astk,
+                        proof: Vec::new(),
+                        estk: Vec::new(),
+                    },
+                    &aq.clone().into_iter().rev().collect::<Vec<_>>(),
+                )?;
+                let mut bstk = stk.clone();
+                bstk.push(b);
+                let b_ret = prove_sub(
+                    ProofCtx {
+                        prop: dummy_prop(),
+                        stk: bstk,
+                        proof: Vec::new(),
+                        estk: Vec::new(),
+                    },
+                    &bq.clone().into_iter().rev().collect::<Vec<_>>(),
+                )?;
+                if !uni(&a_ret, &b_ret) {
+                    println!("or branch conclusions do not match: {a_ret}, {b_ret}");
+                    return None;
+                }
+                stk.push(a_ret);
+                proof.push(Expr::Quote(aq.into_iter().rev().collect()));
+                proof.push(Expr::Quote(bq.into_iter().rev().collect()));
+                proof.push(e);
+            }
             other => {
                 println!("prove other word {other}");
                 return None;
@@ -274,6 +285,31 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
         }),
         None,
     ))
+}
+
+fn prove_sub(mut ctx: ProofCtx, pf: &[Expr]) -> Option<Term> {
+    for e in pf {
+        //println!("running inner: {e:?}");
+        let ctx1 = match prove(ctx, e.clone()) {
+            None => {
+                println!("failed in sub-proof {}.", display_stack(pf));
+                return None;
+            }
+            Some((Mode::Proof(ctx1), None)) => ctx1,
+            _ => {
+                unreachable!("cannot finish/abort proof inside imp_intro?");
+            }
+        };
+        ctx = ctx1;
+    }
+    if ctx.stk.len() != 1 {
+        println!(
+            "stack length after imp_intro: {}, expected 1",
+            ctx.stk.len()
+        );
+        return None;
+    }
+    Some(ctx.stk.pop().expect("pop of vec with length 1 failed?"))
 }
 
 #[derive(Debug, Clone)]
@@ -338,7 +374,21 @@ fn pop_and(s: &mut Vec<Term>) -> Option<(Term, Term)> {
     let o = pop(s)?;
     match o {
         Term::App(Op::And, a, b) => Some((*a, *b)),
-        _ => None,
+        _ => {
+            eprintln!("expected and, found {o}");
+            None
+        }
+    }
+}
+
+fn pop_or(s: &mut Vec<Term>) -> Option<Term> {
+    let o = pop(s)?;
+    match o {
+        Term::App(Op::Or, _, _) => Some(o),
+        _ => {
+            eprintln!("expected or, found {o}");
+            None
+        }
     }
 }
 
@@ -388,22 +438,26 @@ fn apply_imp(imp: Term, a: Term) -> Option<Term> {
 }
 
 fn apply_or(or: Term, a: Term, left: bool) -> Option<Term> {
-    let (oa, ob) = match or {
-        Term::App(Op::Or, a, b) => Some((a, b)),
-        _ => None,
-    }?;
+    let (oa, ob) = dest_or(or)?;
     if left {
         if !uni(&oa, &a) {
-            println!("argument does not match, expeted {oa}, got {a}");
+            println!("argument does not match, expected {oa}, got {a}");
             return None;
         }
-        Some(*ob)
+        Some(ob)
     } else {
         if !uni(&ob, &a) {
-            println!("argument does not match, expeted {oa}, got {a}");
+            println!("argument does not match, expected {ob}, got {a}");
             return None;
         }
-        Some(*oa)
+        Some(oa)
+    }
+}
+
+fn dest_or(or: Term) -> Option<(Term, Term)> {
+    match or {
+        Term::App(Op::Or, a, b) => Some((*a, *b)),
+        _ => None,
     }
 }
 
@@ -418,6 +472,13 @@ fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
         before: make_terms(b)?,
         after: make_terms(a)?,
     })
+}
+
+fn dummy_prop() -> Prop {
+    Prop {
+        before: Vec::new(),
+        after: Vec::new(),
+    }
 }
 
 fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {

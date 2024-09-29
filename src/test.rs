@@ -141,6 +141,13 @@ fn session3_or() {
     for (task, prop, proof) in [
         ("[A] [A B |]", "prop: A -- A ∨ B", "[[A B |] or1_intro]"),
         ("[B] [A B |]", "prop: B -- A ∨ B", "[[A B |] or2_intro]"),
+        ("[A] [A A |]", "prop: A -- A ∨ A", "[[A A |] or1_intro]"),
+        ("[A] [A A |]", "prop: A -- A ∨ A", "[[A A |] or2_intro]"),
+        (
+            "[A B |] [B A |]",
+            "prop: A ∨ B -- B ∨ A",
+            "[[[B A |] or2_intro] [[B A |] or1_intro] or_elim]",
+        ),
     ] {
         check_proof(task, prop, proof);
     }
