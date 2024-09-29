@@ -176,3 +176,11 @@ fn session4_bottom() {
         check_proof(task, prop, proof);
     }
 }
+
+#[test]
+fn session4_case() {
+    for (task, prop, proof) in [("[] [A A ⊥ -> |]", "prop:  -- A ∨ (A → ⊥)", "[[A] cases]")]
+    {
+        check_proof(task, prop, proof);
+    }
+}

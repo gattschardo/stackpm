@@ -269,6 +269,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 proof.push(Expr::Quote(bq.into_iter().rev().collect()));
                 proof.push(e);
             }
+            // bottom_elim: ex falso quod libet
             "efql" => {
                 let _bot = pop_bottom(&mut stk)?;
                 let ret_q = pop_quote(&mut estk)?;
@@ -276,6 +277,22 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 proof.push(Expr::Quote(ret_q.into_iter().rev().collect()));
                 proof.push(e);
                 stk.push(ret_t);
+            }
+            // case analysis: tertium non datur
+            "cases" => {
+                let a_q = pop_quote(&mut estk)?;
+                let a_t = make_term(a_q.clone())?;
+                proof.push(Expr::Quote(a_q.into_iter().rev().collect()));
+                proof.push(e);
+                stk.push(Term::App(
+                    Op::Or,
+                    Box::new(a_t.clone()),
+                    Box::new(Term::App(
+                        Op::Imp,
+                        Box::new(a_t.clone()),
+                        Box::new(Term::Const(Const::Bottom)),
+                    )),
+                ));
             }
             other => {
                 println!("prove other word {other}");
@@ -350,6 +367,9 @@ fn unify(a: &[Term], b: &[Term]) -> bool {
 
 fn uni(a: &Term, b: &Term) -> bool {
     match (a, b) {
+        (Term::Const(ca), Term::Const(cb)) if ca == cb => {
+            // ok
+        }
         (Term::Var(va), Term::Var(vb)) if va == vb => {
             // ok
         }
