@@ -65,17 +65,19 @@ fn repl() {
                         n0
                     }
                 },
-                Mode::Proof(ProofCtx { prop, stk, proof }) => match prove(prop, stk, e, proof) {
-                    None => n0,
-                    Some((Mode::Normal, thm)) => {
-                        match thm {
-                            Some(thm) => s.push(Expr::Thm(thm)),
-                            None => {} //s.push(Expr::Prop(prop)),
+                Mode::Proof(ProofCtx { prop, stk, proof }) => {
+                    match prove(ProofCtx { prop, stk, proof }, e) {
+                        None => n0,
+                        Some((Mode::Normal, thm)) => {
+                            match thm {
+                                Some(thm) => s.push(Expr::Thm(thm)),
+                                None => {} //s.push(Expr::Prop(prop)),
+                            }
+                            Mode::Normal
                         }
-                        Mode::Normal
+                        Some((p, _)) => p,
                     }
-                    Some((p, _)) => p,
-                },
+                }
             };
         }
     }
@@ -104,19 +106,20 @@ where
     }
 }
 
-fn prove(
-    prop: Prop,
-    mut s: Vec<Term>,
-    e: Expr,
-    mut proof: Vec<Expr>,
-) -> Option<(Mode, Option<Theorem>)> {
+fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
+    let ProofCtx {
+        prop,
+        mut stk,
+        mut proof,
+        ..
+    } = ctx;
     match e {
         Expr::Word(w) if w == "qed" => {
-            if !unify(&s, &prop.after) {
+            if !unify(&stk, &prop.after) {
                 println!(
                     "proof not finished, expected {}, have {}",
                     display_stack(&prop.after),
-                    display_stack(&s)
+                    display_stack(&stk)
                 );
                 return None;
             }
@@ -128,52 +131,52 @@ fn prove(
         }
         Expr::Word(ref w) => match w.as_ref() {
             "drop" => {
-                let _ = pop(&mut s)?;
+                let _ = pop(&mut stk)?;
                 proof.push(e.clone());
             }
             "swap" => {
-                let a = pop(&mut s)?;
-                let b = pop(&mut s)?;
+                let a = pop(&mut stk)?;
+                let b = pop(&mut stk)?;
                 proof.push(e.clone());
-                s.push(a);
-                s.push(b);
+                stk.push(a);
+                stk.push(b);
             }
             "dig2" => {
-                let a = pop(&mut s)?;
-                let b = pop(&mut s)?;
-                let c = pop(&mut s)?;
+                let a = pop(&mut stk)?;
+                let b = pop(&mut stk)?;
+                let c = pop(&mut stk)?;
                 proof.push(e.clone());
-                s.push(b);
-                s.push(a);
-                s.push(c);
+                stk.push(b);
+                stk.push(a);
+                stk.push(c);
             }
             "bury2" => {
-                let a = pop(&mut s)?;
-                let b = pop(&mut s)?;
-                let c = pop(&mut s)?;
+                let a = pop(&mut stk)?;
+                let b = pop(&mut stk)?;
+                let c = pop(&mut stk)?;
                 proof.push(e.clone());
-                s.push(a);
-                s.push(c);
-                s.push(b);
+                stk.push(a);
+                stk.push(c);
+                stk.push(b);
             }
             "and_intro" => {
-                let b = pop(&mut s)?;
-                let a = pop(&mut s)?;
+                let b = pop(&mut stk)?;
+                let a = pop(&mut stk)?;
                 proof.push(e.clone());
-                s.push(Term::App(Op::And, Box::new(a), Box::new(b)));
+                stk.push(Term::App(Op::And, Box::new(a), Box::new(b)));
             }
             "and_elim" => {
-                let (a, b) = pop_and(&mut s)?;
+                let (a, b) = pop_and(&mut stk)?;
                 proof.push(e.clone());
-                s.push(a);
-                s.push(b);
+                stk.push(a);
+                stk.push(b);
             }
             "imp_elim" => {
-                let imp = pop_imp(&mut s)?;
-                let a = pop(&mut s)?;
+                let imp = pop_imp(&mut stk)?;
+                let a = pop(&mut stk)?;
                 let b = apply_imp(imp, a)?;
                 proof.push(e.clone());
-                s.push(b);
+                stk.push(b);
             }
             other => {
                 println!("prove other word {other}");
@@ -185,14 +188,7 @@ fn prove(
             return None;
         }
     }
-    Some((
-        Mode::Proof(ProofCtx {
-            prop,
-            stk: s,
-            proof,
-        }),
-        None,
-    ))
+    Some((Mode::Proof(ProofCtx { prop, stk, proof }), None))
 }
 
 #[derive(Debug, Clone)]

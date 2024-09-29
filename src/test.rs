@@ -36,7 +36,14 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
     println!("trying proof: {}", display_stack(&v));
     let mut done = false;
     for e in v {
-        let (stk1, pf1) = match prove(p.as_prop().unwrap().clone(), stk, e, pf) {
+        let (stk1, pf1) = match prove(
+            ProofCtx {
+                prop: p.as_prop().unwrap().clone(),
+                stk,
+                proof: pf,
+            },
+            e,
+        ) {
             Some((Mode::Proof(ProofCtx { stk, proof, .. }), _)) => (stk, proof),
             Some((Mode::Normal, thm)) => {
                 assert_eq!(display_stack(&thm.unwrap().proof), display_stack(&v0));
