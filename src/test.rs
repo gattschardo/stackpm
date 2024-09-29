@@ -22,7 +22,7 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
     println!("{p}");
     assert_eq!(prop, format!("{p}"));
     let mut ctx = init_proof(p.as_prop().unwrap().clone());
-    let mut v = parse(proof)
+    let v = parse(proof)
         .unwrap()
         .pop()
         .unwrap()
@@ -30,25 +30,26 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
         .unwrap()
         .to_vec();
     let v0 = v.clone();
-    v.push(Expr::Word("qed".to_string()));
     println!("trying proof: {}", display_stack(&v));
-    let mut done = false;
     for e in v {
         let ctx1 = match prove(ctx, e) {
             Some((Mode::Proof(ctx1), _)) => ctx1,
-            Some((Mode::Normal, thm)) => {
-                assert_eq!(display_stack(&thm.unwrap().proof), display_stack(&v0));
-                done = true;
-                break;
-            }
             _ => {
-                assert!(false);
-                return;
+                assert!(false, "failed in proof step");
+                unreachable!();
             }
         };
         ctx = ctx1;
     }
-    assert!(done);
+    match prove(ctx, Expr::Word("qed".to_string())) {
+        Some((Mode::Normal, thm)) => {
+            assert!(thm.is_some());
+            assert_eq!(display_stack(&thm.unwrap().proof), display_stack(&v0));
+        }
+        _ => {
+            assert!(false, "failed to finish proof");
+        }
+    }
 }
 
 #[test]
@@ -104,6 +105,8 @@ fn session2_impl() {
             "[bury2 imp_elim swap imp_elim]",
         ),
         //(_, "prop: A A → B A → C B → D C → D -- D", _),
+        // not in incredible pm but can be formulated here:
+        ("[] [A A ->]", "prop:  -- A → A", "[[] [A] imp_intro]"),
         (
             "[A B -> B C ->] [A C ->]",
             "prop: A → B B → C -- A → C",
