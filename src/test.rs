@@ -148,6 +148,11 @@ fn session3_or() {
             "prop: A ∨ B -- B ∨ A",
             "[[[B A |] or2_intro] [[B A |] or1_intro] or_elim]",
         ),
+        (
+            "[A B & C |] [A C | B C | &]",
+            "prop: (A ∧ B) ∨ C -- (A ∨ C) ∧ (B ∨ C)",
+            "[[and_elim [B C ∨] or1_intro swap [A C ∨] or1_intro swap and_intro] [dup [A C ∨] or2_intro swap [B C ∨] or2_intro and_intro] or_elim]"
+        ),
     ] {
         check_proof(task, prop, proof);
     }

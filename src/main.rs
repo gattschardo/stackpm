@@ -141,6 +141,12 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
             return Some((Mode::Normal, None));
         }
         Expr::Word(ref w) => match w.as_ref() {
+            "dup" => {
+                let a = pop(&mut stk)?;
+                stk.push(a.clone());
+                stk.push(a);
+                proof.push(e.clone());
+            }
             "drop" => {
                 let _ = pop(&mut stk)?;
                 proof.push(e.clone());
