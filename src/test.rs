@@ -105,13 +105,42 @@ fn session2_impl() {
             "[bury2 imp_elim swap imp_elim]",
         ),
         //(_, "prop: A A → B A → C B → D C → D -- D", _),
-        // not in incredible pm but can be formulated here:
-        ("[] [A A ->]", "prop:  -- A → A", "[[] [A] imp_intro]"),
         (
             "[A B -> B C ->] [A C ->]",
             "prop: A → B B → C -- A → C",
             "[[dig2 imp_elim swap imp_elim] [A] imp_intro swap drop swap drop]",
         ),
+        ("[] [A A ->]", "prop:  -- A → A", "[[] [A] imp_intro]"),
+        (
+            "[A C -> B C -> A B &] [C]",
+            "prop: A → C B → C A ∧ B -- C",
+            "[and_elim dig2 imp_elim swap drop swap drop]",
+        ),
+        (
+            "[A C -> B C ->] [A B & C ->]",
+            "prop: A → C B → C -- (A ∧ B) → C",
+            "[[and_elim dig2 imp_elim swap drop swap drop] [A B &] imp_intro swap drop swap drop]",
+        ),
+        (
+            "[B] [A B ->]",
+            "prop: B -- A → B",
+            "[[drop] [A] imp_intro swap drop]",
+        ),
+        (
+            "[A B C -> ->] [A B & C ->]",
+            "prop: A → (B → C) -- (A ∧ B) → C",
+            "[[and_elim swap dig2 imp_elim imp_elim] [A B &] imp_intro swap drop]",
+        ),
+    ] {
+        check_proof(task, prop, proof);
+    }
+}
+
+#[test]
+fn session3_or() {
+    for (task, prop, proof) in [
+        ("[A] [A B |]", "prop: A -- A ∨ B", "[[A B |] or1_intro]"),
+        ("[B] [A B |]", "prop: B -- A ∨ B", "[[A B |] or2_intro]"),
     ] {
         check_proof(task, prop, proof);
     }

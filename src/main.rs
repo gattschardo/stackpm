@@ -224,7 +224,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                     .expect("pop of vec with length 1 failed?");
                 stk.push(Term::App(Op::Imp, Box::new(arg_term), Box::new(ret_term)));
                 proof.push(Expr::Quote(pf_q.into_iter().rev().collect()));
-                proof.push(Expr::Quote(arg_q));
+                proof.push(Expr::Quote(arg_q.into_iter().rev().collect()));
                 proof.push(e);
             }
             "imp_elim" => {
@@ -233,6 +233,24 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 let b = apply_imp(imp, a)?;
                 proof.push(e.clone());
                 stk.push(b);
+            }
+            "or1_intro" => {
+                let oq = pop_quote(&mut estk)?;
+                let o = make_term(oq.clone())?;
+                let a = pop(&mut stk)?;
+                let b = apply_or(o, a.clone(), true)?;
+                proof.push(Expr::Quote(oq.into_iter().rev().collect()));
+                proof.push(e);
+                stk.push(Term::App(Op::Or, Box::new(a), Box::new(b)));
+            }
+            "or2_intro" => {
+                let oq = pop_quote(&mut estk)?;
+                let o = make_term(oq.clone())?;
+                let b = pop(&mut stk)?;
+                let a = apply_or(o, b.clone(), false)?;
+                proof.push(Expr::Quote(oq.into_iter().rev().collect()));
+                proof.push(e);
+                stk.push(Term::App(Op::Or, Box::new(a), Box::new(b)));
             }
             other => {
                 println!("prove other word {other}");
@@ -367,6 +385,26 @@ fn apply_imp(imp: Term, a: Term) -> Option<Term> {
         return None;
     }
     Some(*conc)
+}
+
+fn apply_or(or: Term, a: Term, left: bool) -> Option<Term> {
+    let (oa, ob) = match or {
+        Term::App(Op::Or, a, b) => Some((a, b)),
+        _ => None,
+    }?;
+    if left {
+        if !uni(&oa, &a) {
+            println!("argument does not match, expeted {oa}, got {a}");
+            return None;
+        }
+        Some(*ob)
+    } else {
+        if !uni(&ob, &a) {
+            println!("argument does not match, expeted {oa}, got {a}");
+            return None;
+        }
+        Some(*oa)
+    }
 }
 
 #[derive(Debug, Clone)]
