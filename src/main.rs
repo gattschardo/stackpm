@@ -122,7 +122,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
         prop,
         mut stk,
         mut proof,
-        estk,
+        mut estk,
     } = ctx;
     match e {
         Expr::Word(w) if w == "qed" => {
@@ -182,6 +182,51 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 stk.push(a);
                 stk.push(b);
             }
+            "imp_intro" => {
+                let arg_q = pop_quote(&mut estk)?;
+                let arg_term = make_term(arg_q.clone())?;
+                let pf_q = pop_quote(&mut estk)?;
+                let mut inner_stk = stk.clone();
+                inner_stk.push(arg_term.clone());
+                let mut inner_ctx = ProofCtx {
+                    prop: prop.clone(),
+                    stk: inner_stk,
+                    proof: Vec::new(),
+                    estk: Vec::new(),
+                };
+                for e in pf_q.clone().into_iter().rev() {
+                    println!("running inner: {e:?}");
+                    let ctx1 = match prove(inner_ctx, e) {
+                        None => {
+                            println!("failed to introduce implication.");
+                            return None;
+                        }
+                        Some((Mode::Proof(ctx1), None)) => ctx1,
+                        y @ Some((Mode::Normal, None)) => {
+                            return y;
+                        }
+                        _ => {
+                            unreachable!("cannot finish proof inside imp_intro?");
+                        }
+                    };
+                    inner_ctx = ctx1;
+                }
+                if inner_ctx.stk.len() != 1 {
+                    println!(
+                        "stack length after imp_intro: {}, expected 1",
+                        inner_ctx.stk.len()
+                    );
+                    return None;
+                }
+                let ret_term = inner_ctx
+                    .stk
+                    .pop()
+                    .expect("pop of vec with length 1 failed?");
+                stk.push(Term::App(Op::Imp, Box::new(arg_term), Box::new(ret_term)));
+                proof.push(Expr::Quote(pf_q.into_iter().rev().collect()));
+                proof.push(Expr::Quote(arg_q));
+                proof.push(e);
+            }
             "imp_elim" => {
                 let imp = pop_imp(&mut stk)?;
                 let a = pop(&mut stk)?;
@@ -194,6 +239,9 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 return None;
             }
         },
+        expr @ Expr::Quote(_) => {
+            estk.push(expr);
+        }
         other => {
             println!("prove {other}");
             return None;
@@ -340,15 +388,8 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
         Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
         Expr::Word(w) => match w.as_ref() {
             "term" => {
-                let a = pop_quote(s)?;
-                let mut ts = make_terms(a)?;
-                match ts.len() {
-                    1 => s.push(Expr::Term(ts.pop().expect("pop failed for vec of len() 1"))),
-                    n => {
-                        println!("expected single element term, found {n}");
-                        return None;
-                    }
-                }
+                let q = pop_quote(s)?;
+                s.push(Expr::Term(make_term(q)?));
             }
             "claim" => {
                 let a = pop_quote(s)?;
@@ -396,6 +437,17 @@ fn make_terms(mut p: Vec<Expr>) -> Option<Vec<Term>> {
         }
     }
     Some(s)
+}
+
+fn make_term(p: Vec<Expr>) -> Option<Term> {
+    let mut ts = make_terms(p)?;
+    match ts.len() {
+        1 => Some(ts.pop().expect("pop failed for vec of len() 1")),
+        n => {
+            println!("expected single element term, found {n}");
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

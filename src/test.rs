@@ -104,7 +104,11 @@ fn session2_impl() {
             "[bury2 imp_elim swap imp_elim]",
         ),
         //(_, "prop: A A → B A → C B → D C → D -- D", _),
-        //("[A B -> B C ->] [A -> C]", "prop: A → B B → C -- A → C", "[[dig2 imp_elim imp_elim] [A] imp_intro"),
+        (
+            "[A B -> B C ->] [A C ->]",
+            "prop: A → B B → C -- A → C",
+            "[[dig2 imp_elim swap imp_elim] [A] imp_intro swap drop swap drop]",
+        ),
     ] {
         check_proof(task, prop, proof);
     }
