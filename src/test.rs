@@ -17,13 +17,11 @@ fn eval2(i: &str, j: &str) -> crate::Expr {
 }
 
 fn check_proof(task: &str, prop: &str, proof: &str) {
-    use crate::{ast::parse, display_stack, prove, Expr, Mode, ProofCtx, Prop};
+    use crate::{ast::parse, display_stack, init_proof, prove, Expr, Mode};
     let p = eval2(task, "claim");
     println!("{p}");
     assert_eq!(prop, format!("{p}"));
-    let Prop { before, .. } = p.as_prop().unwrap();
-    let mut stk = before.clone();
-    let mut pf = Vec::new();
+    let mut ctx = init_proof(p.as_prop().unwrap().clone());
     let mut v = parse(proof)
         .unwrap()
         .pop()
@@ -36,15 +34,8 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
     println!("trying proof: {}", display_stack(&v));
     let mut done = false;
     for e in v {
-        let (stk1, pf1) = match prove(
-            ProofCtx {
-                prop: p.as_prop().unwrap().clone(),
-                stk,
-                proof: pf,
-            },
-            e,
-        ) {
-            Some((Mode::Proof(ProofCtx { stk, proof, .. }), _)) => (stk, proof),
+        let ctx1 = match prove(ctx, e) {
+            Some((Mode::Proof(ctx1), _)) => ctx1,
             Some((Mode::Normal, thm)) => {
                 assert_eq!(display_stack(&thm.unwrap().proof), display_stack(&v0));
                 done = true;
@@ -55,8 +46,7 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
                 return;
             }
         };
-        stk = stk1;
-        pf = pf1;
+        ctx = ctx1;
     }
     assert!(done);
 }

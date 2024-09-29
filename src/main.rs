@@ -19,12 +19,23 @@ struct ProofCtx {
     prop: Prop,
     stk: Vec<Term>,
     proof: Vec<Expr>,
+    estk: Vec<Expr>,
 }
 
 #[derive(Debug, Clone)]
 enum Mode {
     Normal,
     Proof(ProofCtx),
+}
+
+fn init_proof(prop: Prop) -> ProofCtx {
+    let Prop { ref before, .. } = prop;
+    ProofCtx {
+        prop: prop.clone(),
+        stk: before.clone(),
+        proof: Vec::new(),
+        estk: Vec::new(),
+    }
 }
 
 fn repl() {
@@ -65,8 +76,8 @@ fn repl() {
                         n0
                     }
                 },
-                Mode::Proof(ProofCtx { prop, stk, proof }) => {
-                    match prove(ProofCtx { prop, stk, proof }, e) {
+                Mode::Proof(ctx) => {
+                    match prove(ctx, e) {
                         None => n0,
                         Some((Mode::Normal, thm)) => {
                             match thm {
@@ -111,7 +122,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
         prop,
         mut stk,
         mut proof,
-        ..
+        estk,
     } = ctx;
     match e {
         Expr::Word(w) if w == "qed" => {
@@ -188,7 +199,15 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
             return None;
         }
     }
-    Some((Mode::Proof(ProofCtx { prop, stk, proof }), None))
+    Some((
+        Mode::Proof(ProofCtx {
+            prop,
+            stk,
+            proof,
+            estk,
+        }),
+        None,
+    ))
 }
 
 #[derive(Debug, Clone)]
@@ -337,12 +356,7 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
                 s.push(Expr::Prop(make_prop(a, b)?));
             }
             "prove" => {
-                let ref p @ Prop { ref before, .. } = pop_prop(s)?;
-                return Some(Mode::Proof(ProofCtx {
-                    prop: p.clone(),
-                    stk: before.clone(),
-                    proof: Vec::new(),
-                }));
+                return Some(Mode::Proof(init_proof(pop_prop(s)?)));
             }
             other => {
                 println!("other word {other}");
