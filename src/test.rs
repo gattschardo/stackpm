@@ -54,9 +54,14 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
 
 #[test]
 fn term() {
-    let t = eval2("[A B & C | D ->]", "term");
-    println!("{t}");
-    assert_eq!("((A ∧ B) ∨ C) → D", format!("{t}"));
+    for (q, pretty) in [
+        ("[A B & C | D ->]", "((A ∧ B) ∨ C) → D"),
+        ("[A ⊥ ->]", "A → ⊥"),
+    ] {
+        let t = eval2(q, "term");
+        println!("{t}");
+        assert_eq!(pretty, format!("{t}"));
+    }
 }
 
 #[test]

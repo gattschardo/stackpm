@@ -520,6 +520,7 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
 
 fn render(e: &Term) -> String {
     match e {
+        Term::Const(c) => format!("{c}"),
         Term::Var(v) => v.clone(),
         a @ Term::App(_, _, _) => format!("({a})"),
     }
@@ -529,6 +530,7 @@ fn make_terms(mut p: Vec<Expr>) -> Option<Vec<Term>> {
     let mut s = Vec::new();
     while let Some(e) = p.pop() {
         match e {
+            Expr::Const(c) => s.push(Term::Const(c)),
             Expr::Var(v) => s.push(Term::Var(v)),
             Expr::Op(o) => {
                 let b = Box::new(s.pop()?);
@@ -556,6 +558,12 @@ fn make_term(p: Vec<Expr>) -> Option<Term> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+enum Const {
+    Bottom,
+    Top,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Op {
     Help,
     And,
@@ -565,12 +573,14 @@ enum Op {
 
 #[derive(Debug, Clone)]
 enum Term {
+    Const(Const),
     Var(String),
     App(Op, Box<Term>, Box<Term>),
 }
 
 #[derive(Debug, Clone)]
 enum Expr {
+    Const(Const),
     Op(Op),
     Var(String),
     Word(String),
@@ -592,6 +602,15 @@ impl Expr {
         match self {
             Expr::Quote(q) => Some(&q),
             _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for Const {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Const::Bottom => write!(f, "⊥"),
+            Const::Top => write!(f, "⊤"),
         }
     }
 }
@@ -627,6 +646,7 @@ impl std::fmt::Display for Term {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Term::App(o, a, b) => write!(f, "{} {o} {}", render(&*a), render(&*b)),
+            Term::Const(c) => write!(f, "{c}"),
             Term::Var(v) => write!(f, "{v}"),
         }
     }
@@ -649,6 +669,7 @@ impl std::fmt::Display for Theorem {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
+            Expr::Const(c) => write!(f, "{c}"),
             Expr::Op(o) => write!(f, "{o}"),
             Expr::Var(v) => write!(f, "{v}"),
             Expr::Word(w) => write!(f, "{w}"),
@@ -698,6 +719,7 @@ mod types {
 
     pub fn check<'a>(ctx: &HashMap<String, WTyp>, e: &'a Expr) -> Option<&'a str> {
         match e {
+            Expr::Const(_) => None,
             Expr::Op(_) => None,
             Expr::Term(_) => None,
             Expr::Var(_) => None,
@@ -715,7 +737,7 @@ mod types {
 mod ast {
     use pest_derive::Parser;
 
-    use crate::{Expr, Op};
+    use crate::{Const, Expr, Op};
 
     type ParseError = Box<pest::error::Error<Rule>>;
 
@@ -730,13 +752,21 @@ mod ast {
         ))
     }
 
+    fn to_const(c: &str) -> Const {
+        match c {
+            "⊥" => Const::Bottom,
+            "⊤" => Const::Top,
+            _ => unreachable!("missing const {c}"),
+        }
+    }
+
     fn to_op(o: &str) -> Op {
         match o {
             "?" => Op::Help,
             "→" | "->" => Op::Imp,
             "∧" | "&" => Op::And,
             "∨" | "|" => Op::Or,
-            _ => unreachable!(),
+            _ => unreachable!("missing op {o}"),
         }
     }
 
@@ -747,6 +777,7 @@ mod ast {
                 break;
             }
             r.push(match e.as_rule() {
+                Rule::constant => Expr::Const(to_const(e.as_str())),
                 Rule::op => Expr::Op(to_op(e.as_str())),
                 Rule::var => Expr::Var(e.as_str().to_string()),
                 Rule::word => Expr::Word(e.as_str().to_string()),
