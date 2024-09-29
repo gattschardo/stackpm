@@ -162,3 +162,17 @@ fn session3_or() {
         check_proof(task, prop, proof);
     }
 }
+
+#[test]
+fn session4_bottom() {
+    for (task, prop, proof) in [
+        (
+            "[⊥] [A B &]",
+            "prop: ⊥ -- A ∧ B",
+            "[dup [A] efql swap [B] efql and_intro]",
+        ),
+        ("[⊥] [A B &]", "prop: ⊥ -- A ∧ B", "[[A B &] efql]"),
+    ] {
+        check_proof(task, prop, proof);
+    }
+}

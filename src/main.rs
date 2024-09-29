@@ -269,6 +269,14 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 proof.push(Expr::Quote(bq.into_iter().rev().collect()));
                 proof.push(e);
             }
+            "efql" => {
+                let _bot = pop_bottom(&mut stk)?;
+                let ret_q = pop_quote(&mut estk)?;
+                let ret_t = make_term(ret_q.clone())?;
+                proof.push(Expr::Quote(ret_q.into_iter().rev().collect()));
+                proof.push(e);
+                stk.push(ret_t);
+            }
             other => {
                 println!("prove other word {other}");
                 return None;
@@ -404,6 +412,17 @@ fn pop_imp(s: &mut Vec<Term>) -> Option<Term> {
         Term::App(Op::Imp, _, _) => Some(i),
         _ => {
             eprintln!("expected implication, found {i}");
+            None
+        }
+    }
+}
+
+fn pop_bottom(s: &mut Vec<Term>) -> Option<Term> {
+    let b = pop(s)?;
+    match b {
+        Term::Const(Const::Bottom) => Some(b),
+        _ => {
+            eprintln!("expected bottom (⊥), found {b}");
             None
         }
     }
