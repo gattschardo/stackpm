@@ -195,6 +195,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 let mut inner_stk = stk.clone();
                 inner_stk.push(arg_term.clone());
                 let ret_term = prove_sub(
+                    "imp_intro",
                     ProofCtx {
                         prop: dummy_prop(),
                         stk: inner_stk,
@@ -241,6 +242,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 let mut astk = stk.clone();
                 astk.push(a);
                 let a_ret = prove_sub(
+                    "or_elim (1)",
                     ProofCtx {
                         prop: dummy_prop(),
                         stk: astk,
@@ -252,6 +254,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 let mut bstk = stk.clone();
                 bstk.push(b);
                 let b_ret = prove_sub(
+                    "or_elim (2)",
                     ProofCtx {
                         prop: dummy_prop(),
                         stk: bstk,
@@ -318,15 +321,19 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
     ))
 }
 
-fn prove_sub(mut ctx: ProofCtx, pf: &[Expr]) -> Option<Term> {
+fn prove_sub(lbl: &str, mut ctx: ProofCtx, pf: &[Expr]) -> Option<Term> {
+    println!("starting sub-proof with stack {}", display_stack(&ctx.stk));
     for e in pf {
-        //println!("running inner: {e:?}");
+        println!("running inner: {e:?}");
         let ctx1 = match prove(ctx, e.clone()) {
             None => {
                 println!("failed in sub-proof {}.", display_stack(pf));
                 return None;
             }
-            Some((Mode::Proof(ctx1), None)) => ctx1,
+            Some((Mode::Proof(ctx1), None)) => {
+                println!("after: {}", display_stack(&ctx1.stk));
+                ctx1
+            }
             _ => {
                 unreachable!("cannot finish/abort proof inside imp_intro?");
             }
@@ -334,10 +341,7 @@ fn prove_sub(mut ctx: ProofCtx, pf: &[Expr]) -> Option<Term> {
         ctx = ctx1;
     }
     if ctx.stk.len() != 1 {
-        println!(
-            "stack length after imp_intro: {}, expected 1",
-            ctx.stk.len()
-        );
+        println!("stack length after {lbl}: {}, expected 1", ctx.stk.len());
         return None;
     }
     Some(ctx.stk.pop().expect("pop of vec with length 1 failed?"))

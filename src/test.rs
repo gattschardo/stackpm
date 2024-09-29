@@ -179,8 +179,40 @@ fn session4_bottom() {
 
 #[test]
 fn session4_case() {
-    for (task, prop, proof) in [("[] [A A ⊥ -> |]", "prop:  -- A ∨ (A → ⊥)", "[[A] cases]")]
-    {
+    for (task, prop, proof) in [
+        ("[] [A A ⊥ -> |]", "prop:  -- A ∨ (A → ⊥)", "[[A] cases]"),
+        (
+            "[A ⊥ -> ⊥ ->] [A]",
+            "prop: (A → ⊥) → ⊥ -- A",
+            "[[A] cases [swap drop] [swap imp_elim [A] efql] or_elim swap drop]",
+        ),
+        // lll
+        (
+            "[A B -> ⊥ -> B] [A B ⊥ -> &]",
+            "prop: (A → B) → ⊥ B -- A ∧ (B → ⊥)",
+            "[[drop swap drop] [A] imp_intro swap drop swap imp_elim [A B ⊥ -> &] efql]",
+        ),
+        (
+            "[A B -> ⊥ -> B ⊥ -> A] [A B ⊥ -> &]",
+            "prop: (A → B) → ⊥ B → ⊥ A -- A ∧ (B → ⊥)",
+            "[swap and_intro swap drop]",
+        ),
+        ("[A B -> ⊥ -> B ⊥ -> A ⊥ ->] [A B ⊥ -> &]",
+        "prop: (A → B) → ⊥ B → ⊥ A → ⊥ -- A ∧ (B → ⊥)",
+        "[[swap imp_elim [B] efql swap drop swap drop] [A] imp_intro swap drop swap drop swap imp_elim [A B ⊥ → ∧] efql]"),
+        // aaa
+        (
+            "[A B -> ⊥ -> B ⊥ ->] [A B ⊥ -> &]",
+            "prop: (A → B) → ⊥ B → ⊥ -- A ∧ (B → ⊥)",
+            "[[A] cases [swap and_intro swap drop] [[swap imp_elim [B] efql swap drop swap drop] [A] imp_intro swap drop swap drop swap imp_elim [A B ⊥ → ∧] efql] or_elim swap drop swap drop]"
+        ),
+        // zzz
+        (
+            "[A B -> ⊥ ->] [A B ⊥ -> &]",
+            "prop: (A → B) → ⊥ -- A ∧ (B → ⊥)",
+            "[[B] cases [[drop swap drop] [A] imp_intro swap drop swap imp_elim [A B ⊥ -> &] efql] [[A] cases [swap and_intro swap drop] [[swap imp_elim [B] efql swap drop swap drop] [A] imp_intro swap drop swap drop swap imp_elim [A B ⊥ → ∧] efql] or_elim swap drop swap drop] or_elim swap drop]",
+        ),
+    ] {
         check_proof(task, prop, proof);
     }
 }
