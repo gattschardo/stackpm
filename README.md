@@ -2,7 +2,7 @@ StackPM
 -------
 
 The goal is to create an interactive theorem prover supporting similar concepts
-as "the incredible proof machine" (see [incredible.pm]) -- so mostly
+as "the incredible proof machine" (see [playground](http://incredible.pm) / [repo](https://github.com/nomeata/incredible)) -- so mostly
 first-order logic -- but with a stack-based (think Forth/Joy) instead of a
 visual language.
 
