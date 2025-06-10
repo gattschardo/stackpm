@@ -53,6 +53,25 @@ fn check_proof(task: &str, prop: &str, proof: &str) {
 }
 
 #[test]
+fn hello() {
+    use crate::{ast, Expr};
+
+    let p = ast::parse("[imp] claim prove id qed").unwrap();
+    let q = Expr::Quote(p);
+    let s = format!("{q}");
+    assert_eq!(s, "[[imp] claim prove id qed]".to_string());
+}
+
+#[test]
+fn typecheck() {
+    use crate::{ast, types};
+
+    let i = ast::parse("imp").unwrap();
+    let r = types::check(&types::context(), i.last().unwrap());
+    assert!(r.is_some());
+}
+
+#[test]
 fn term() {
     for (q, pretty) in [
         ("[A B & C | D ->]", "((A ∧ B) ∨ C) → D"),

@@ -1,18 +1,56 @@
 fn main() {
     println!("Hello, stackpm!");
 
-    let p = ast::parse("[imp] claim prove id qed").unwrap();
-    let q = Expr::Quote(p);
-    println!("{q}");
-
-    let i = ast::parse("imp").unwrap();
-    types::check(&types::context(), i.last().unwrap());
-
     repl()
 }
 
 #[cfg(test)]
 mod test;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Const {
+    Bottom,
+    Top,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Op {
+    Help,
+    And,
+    Or,
+    Imp,
+}
+
+#[derive(Debug, Clone)]
+pub enum Term {
+    Const(Const),
+    Var(String),
+    App(Op, Box<Term>, Box<Term>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Prop {
+    before: Vec<Term>,
+    after: Vec<Term>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Theorem {
+    prop: Prop,
+    proof: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Const(Const),
+    Op(Op),
+    Var(String),
+    Word(String),
+    Quote(Vec<Expr>),
+    Term(Term),
+    Prop(Prop),
+    Thm(Theorem),
+}
 
 #[derive(Debug, Clone)]
 struct ProofCtx {
@@ -347,12 +385,6 @@ fn prove_sub(lbl: &str, mut ctx: ProofCtx, pf: &[Expr]) -> Option<Term> {
     Some(ctx.stk.pop().expect("pop of vec with length 1 failed?"))
 }
 
-#[derive(Debug, Clone)]
-struct Theorem {
-    prop: Prop,
-    proof: Vec<Expr>,
-}
-
 fn make_theorem(prop: Prop, proof: Vec<Expr>) -> Theorem {
     Theorem { prop, proof }
 }
@@ -510,12 +542,6 @@ fn dest_or(or: Term) -> Option<(Term, Term)> {
     }
 }
 
-#[derive(Debug, Clone)]
-struct Prop {
-    before: Vec<Term>,
-    after: Vec<Term>,
-}
-
 fn make_prop(a: Vec<Expr>, b: Vec<Expr>) -> Option<Prop> {
     Some(Prop {
         before: make_terms(b)?,
@@ -598,39 +624,6 @@ fn make_term(p: Vec<Expr>) -> Option<Term> {
             None
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Const {
-    Bottom,
-    Top,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Op {
-    Help,
-    And,
-    Or,
-    Imp,
-}
-
-#[derive(Debug, Clone)]
-enum Term {
-    Const(Const),
-    Var(String),
-    App(Op, Box<Term>, Box<Term>),
-}
-
-#[derive(Debug, Clone)]
-enum Expr {
-    Const(Const),
-    Op(Op),
-    Var(String),
-    Word(String),
-    Quote(Vec<Expr>),
-    Term(Term),
-    Prop(Prop),
-    Thm(Theorem),
 }
 
 impl Expr {
