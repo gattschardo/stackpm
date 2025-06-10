@@ -717,6 +717,8 @@ impl std::fmt::Display for Expr {
     }
 }
 
+// unfinished
+#[allow(dead_code)]
 mod types {
     use std::collections::HashMap;
 
@@ -728,7 +730,6 @@ mod types {
         //Thm,
     }
 
-    #[allow(dead_code)]
     pub struct WTyp {
         before: Vec<Typ>,
         after: Vec<Typ>,
