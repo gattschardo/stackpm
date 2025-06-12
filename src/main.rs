@@ -15,8 +15,8 @@ pub enum Const {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum HelpMode {
-    Status,
-    Commands,
+    Stack,
+    Words,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -102,13 +102,8 @@ fn repl() {
             }
         };
         for e in es {
-            if is_help(&e) {
-                match &m {
-                    Mode::Normal => help("toplevel", &s),
-                    Mode::Proof(ProofCtx { prop, stk, .. }) => {
-                        help(&format!("proving {prop}"), &stk)
-                    }
-                }
+            if let Some(h) = is_help(&e) {
+                help(h, &m, &s);
                 continue;
             }
             let n0 = m.clone();
@@ -138,14 +133,38 @@ fn repl() {
     }
 }
 
-fn is_help(e: &Expr) -> bool {
+fn is_help(e: &Expr) -> Option<HelpMode> {
     match e {
-        Expr::Op(Op::Help(_)) => true,
-        _ => false,
+        Expr::Op(Op::Help(h)) => Some(*h),
+        _ => None,
     }
 }
 
-fn help<T>(m: &str, s: &[T])
+fn help(h: HelpMode, m: &Mode, s: &Vec<Expr>) {
+    match h {
+        HelpMode::Stack => match m {
+            Mode::Normal => show_help("toplevel", &s),
+            Mode::Proof(ProofCtx { prop, stk, .. }) => show_help(&format!("proving {prop}"), &stk),
+        },
+        HelpMode::Words => match m {
+            Mode::Normal => {
+                println!("available toplevel words: claim prove term [Quote]");
+            }
+            Mode::Proof(_) => {
+                println!(
+                    r#"available proof words: abort qed
+                       dup drop swap dig2 bury2
+                       and_intro and_elim
+                       imp_intro imp_elim
+                       or1_intro or2_intro or_elim
+                       efql cases"#
+                );
+            }
+        },
+    }
+}
+
+fn show_help<T>(m: &str, s: &[T])
 where
     T: std::fmt::Display,
 {
@@ -660,8 +679,8 @@ impl std::fmt::Display for Const {
 impl std::fmt::Display for Op {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Op::Help(HelpMode::Status) => write!(f, "?"),
-            Op::Help(HelpMode::Commands) => write!(f, "!"),
+            Op::Help(HelpMode::Stack) => write!(f, "?"),
+            Op::Help(HelpMode::Words) => write!(f, "!"),
             Op::And => write!(f, "∧"),
             Op::Or => write!(f, "∨"),
             Op::Imp => write!(f, "→"),
@@ -806,8 +825,8 @@ mod ast {
 
     fn to_op(o: &str) -> Op {
         match o {
-            "?" => Op::Help(HelpMode::Status),
-            "!" => Op::Help(HelpMode::Commands),
+            "?" => Op::Help(HelpMode::Stack),
+            "!" => Op::Help(HelpMode::Words),
             "→" | "->" => Op::Imp,
             "∧" | "&" => Op::And,
             "∨" | "|" => Op::Or,
