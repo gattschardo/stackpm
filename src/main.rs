@@ -14,8 +14,14 @@ pub enum Const {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HelpMode {
+    Status,
+    Commands,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Op {
-    Help,
+    Help(HelpMode),
     And,
     Or,
     Imp,
@@ -134,7 +140,7 @@ fn repl() {
 
 fn is_help(e: &Expr) -> bool {
     match e {
-        Expr::Op(Op::Help) => true,
+        Expr::Op(Op::Help(_)) => true,
         _ => false,
     }
 }
@@ -558,7 +564,7 @@ fn dummy_prop() -> Prop {
 
 fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
     match e {
-        Expr::Op(Op::Help) => unreachable!("handled above"),
+        Expr::Op(Op::Help(_)) => unreachable!("handled above"),
         Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
         Expr::Word(w) => match w.as_ref() {
             "term" => {
@@ -654,7 +660,8 @@ impl std::fmt::Display for Const {
 impl std::fmt::Display for Op {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Op::Help => write!(f, "?"),
+            Op::Help(HelpMode::Status) => write!(f, "?"),
+            Op::Help(HelpMode::Commands) => write!(f, "!"),
             Op::And => write!(f, "∧"),
             Op::Or => write!(f, "∨"),
             Op::Imp => write!(f, "→"),
@@ -774,7 +781,7 @@ mod types {
 mod ast {
     use pest_derive::Parser;
 
-    use crate::{Const, Expr, Op};
+    use crate::{Const, Expr, HelpMode, Op};
 
     type ParseError = Box<pest::error::Error<Rule>>;
 
@@ -799,7 +806,8 @@ mod ast {
 
     fn to_op(o: &str) -> Op {
         match o {
-            "?" => Op::Help,
+            "?" => Op::Help(HelpMode::Status),
+            "!" => Op::Help(HelpMode::Commands),
             "→" | "->" => Op::Imp,
             "∧" | "&" => Op::And,
             "∨" | "|" => Op::Or,

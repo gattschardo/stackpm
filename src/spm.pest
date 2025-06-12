@@ -1,7 +1,7 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
 constant = @{ "⊥" }
-op = @{ "?" | "&" | "∧" | "|" | "∨" | "->" | "→" }
+op = @{ "?" | "!" | "&" | "∧" | "|" | "∨" | "->" | "→" }
 var = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
 word = @{ ASCII_ALPHA_LOWER ~ (ASCII_ALPHANUMERIC | "_")* }
 
