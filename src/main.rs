@@ -587,7 +587,6 @@ fn dummy_prop() -> Prop {
 fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
     match e {
         Expr::Op(Op::Help(_)) => unreachable!("handled above"),
-        Expr::Word(w) if w == "imp" => s.push(Expr::Word("A".to_string())),
         Expr::Word(w) => match w.as_ref() {
             "term" => {
                 let q = pop_quote(s)?;
