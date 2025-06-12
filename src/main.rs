@@ -1,5 +1,5 @@
 fn main() {
-    println!("Hello, stackpm!");
+    println!("Hello, stackpm! Type `?' to list stack, `!' to list available words");
 
     repl()
 }
@@ -88,7 +88,7 @@ fn repl() {
     //let ctx = types::context();
     let mut run = true;
     while run {
-        let raw = read()
+        let raw = read(&m)
             .or_else(|| {
                 run = false;
                 Some("".to_string())
@@ -148,7 +148,7 @@ fn help(h: HelpMode, m: &Mode, s: &Vec<Expr>) {
         },
         HelpMode::Words => match m {
             Mode::Normal => {
-                println!("available toplevel words: claim prove term [Quote]");
+                println!("available toplevel words: claim prove term [Quote Variables & Other |]");
             }
             Mode::Proof(_) => {
                 println!(
@@ -361,7 +361,7 @@ fn prove(ctx: ProofCtx, e: Expr) -> Option<(Mode, Option<Theorem>)> {
                 ));
             }
             other => {
-                println!("prove other word {other}");
+                println!("unknown proof word `{other}', type `!' to list available words");
                 return None;
             }
         },
@@ -446,9 +446,12 @@ fn uni(a: &Term, b: &Term) -> bool {
     true
 }
 
-fn read() -> Option<String> {
+fn read(m: &Mode) -> Option<String> {
     use std::io::Write;
-    print!("> ");
+    match m {
+        Mode::Normal => print!("> "),
+        Mode::Proof(_) => print!("# "),
+    }
     std::io::stdout().flush().ok()?;
     let mut r = String::new();
     let n = std::io::stdin().read_line(&mut r).ok()?;
@@ -599,7 +602,7 @@ fn exec(s: &mut Vec<Expr>, e: Expr) -> Option<Mode> {
                 return Some(Mode::Proof(init_proof(pop_prop(s)?)));
             }
             other => {
-                println!("other word {other}");
+                println!("unknown word `{other}', type `!' to list available words");
                 return None;
             }
         },
